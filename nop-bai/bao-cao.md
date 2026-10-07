@@ -1,103 +1,53 @@
 # Báo Cáo Lab Day 21 - CI/CD cho AI Systems
 
-<!--
-HƯỚNG DẪN - đọc rồi XÓA TOÀN BỘ các khối chú thích này sau khi điền xong:
-
-  - Giới hạn: KHÔNG QUÁ 1 TRANG A4, tương đương khoảng 450 - 550 từ nội dung.
-  - Chỉ điền vào các chỗ ___ và các ô trong bảng. Không thêm mục mới.
-  - Viết bằng câu hoàn chỉnh, không gạch đầu dòng cụt lủn.
-  - Kiểm tra độ dài sau khi đã xóa hết chú thích:
-        wc -w nop-bai/bao-cao.md
-    và xem trước bản in bằng cách mở file trên GitHub rồi Ctrl+P / Cmd+P.
--->
-
 | | |
 |---|---|
-| Họ và tên | ___ |
-| MSSV | ___ |
+| Họ và tên | Nguyễn Quang Hữu |
+| MSSV | 2A202602756 |
 | Lớp / Khóa | K4 |
-| Repo GitHub | https://github.com/___/___ |
-| Ngày nộp | ___ |
+| Repo GitHub | https://github.com/Anreak/K4-L3-DAY21-NguyenQuangHuu-2A202602756-CI-CD-for-AI-Systems |
+| Ngày nộp | 07/10/2026 |
 
 ---
 
 ## 1. Bộ Siêu Tham Số Đã Chọn và Lý Do
 
-<!-- Khoảng 120 - 150 từ. Điền kết quả thật từ MLflow UI ở Bước 1, tối thiểu 3 lần chạy. -->
-
 | Lần chạy | n_estimators | learning_rate | max_depth | f1_score | accuracy |
 |---|---|---|---|---|---|
-| 1 | ___ | ___ | ___ | ___ | ___ |
-| 2 | ___ | ___ | ___ | ___ | ___ |
-| 3 | ___ | ___ | ___ | ___ | ___ |
+| 1 | 100 | 0.1 | 3 | 0.7109 | 0.8780 |
+| 2 | 50 | 0.05 | 2 | 0.6051 | 0.8460 |
+| 3 | 200 | 0.1 | 5 | 0.7149 | 0.8740 |
+| 4 | 150 | 0.1 | 3 | 0.7222 | 0.8800 |
 
-**Bộ siêu tham số đã chọn:** `n_estimators=___`, `learning_rate=___`, `max_depth=___`.
+Bộ siêu tham số đã chọn: n_estimators=150, learning_rate=0.1, max_depth=3.
 
-**Lý do:** ___
-
-<!--
-Trả lời trong phần Lý do:
-  - Vì sao bộ này tốt hơn các bộ còn lại (dựa trên f1_score, không phải accuracy)?
-  - Lần chạy có accuracy cao nhất có trùng với lần có f1_score cao nhất không?
-    Nếu không, điều đó nói lên điều gì?
-  - Bạn quan sát thấy đánh đổi nào giữa n_estimators và learning_rate?
--->
+Lý do: Cấu hình này mang lại f1_score cao nhất (0.7222) và accuracy cao nhất (0.8800) trên tập holdout, vượt xa quality gate f1 >= 0.65. So với lần 2 (n_estimators=50, max_depth=2, F1=0.6051), mô hình có đủ số cây để học tốt lớp thiểu số. So với lần 3 (max_depth=5, 200 cây), việc tăng độ sâu lên 5 khiến mô hình chớm overfitting làm accuracy giảm từ 0.8800 xuống 0.8740. Ta nhận thấy sự đánh đổi: learning_rate vừa phải (0.1) kết hợp 150 cây ở độ sâu 3 giúp gradient boosting hội tụ ổn định nhất.
 
 ---
 
 ## 2. Vì Sao Ngưỡng Chất Lượng Đặt Trên F1 Chứ Không Phải Accuracy
 
-<!-- Khoảng 120 - 150 từ. -->
+Tập dữ liệu Adult có phân bố lớp mất cân bằng nặng khi chỉ 24.8% mẫu thuộc lớp thu nhập cao (target = 1) và 75.2% thuộc lớp thu nhập thấp (target = 0). Nếu dùng một mô hình vô dụng luôn gán nhãn thu nhập thấp cho mọi trường hợp, accuracy vẫn đạt 0.752 (75.2%), tạo ảo tưởng về độ chính xác nhưng hoàn toàn thất bại trong việc nhận diện người thu nhập cao (F1 lớp dương bằng 0). 
 
-___
-
-<!--
-Cần nêu được:
-  - Phân bố lớp của tập dữ liệu (tỷ lệ lớp thu nhập > 50K) và hệ quả của nó.
-  - Accuracy của một mô hình luôn trả lời "thu nhập thấp" là bao nhiêu, vì sao con số
-    đó gây hiểu nhầm.
-  - F1 của lớp dương đo điều gì mà accuracy không đo được.
-  - Vì sao KHÔNG dùng average="weighted" hay average="macro" khi gọi f1_score.
--->
+F1 của lớp dương là trung bình điều hòa giữa Precision và Recall, phản ánh thực chất cả hai yêu cầu: không bỏ sót người thu nhập cao và không đoán bừa người thu nhập thấp thành cao. Khi tính toán bắt buộc dùng f1_score mặc định cho lớp dương, tuyệt đối không dùng average="weighted" hay average="macro" vì các tùy chọn này sẽ gộp lớp đa số vào làm chỉ số bị kéo lên cao giả tạo, vô hiệu hóa ngưỡng an toàn 0.65.
 
 ---
 
 ## 3. Khó Khăn Gặp Phải và Cách Giải Quyết
 
-<!-- Nêu 2 - 3 khó khăn thật, mỗi ô một câu ngắn. -->
-
 | Khó khăn | Nguyên nhân | Cách giải quyết |
 |---|---|---|
-| ___ | ___ | ___ |
-| ___ | ___ | ___ |
-| ___ | ___ | ___ |
+| Lỗi thiếu pkg_resources khi chạy pytest và MLflow | Setuptools bản mới đã loại bỏ thư viện pkg_resources | Cố định phiên bản setuptools<70 trong requirements.txt |
+| Xung đột thư viện SQLAlchemy với MLflow 2.13.0 | SQLAlchemy 2.1 loại bỏ FallbackAsyncAdaptedQueuePool | Giới hạn sqlalchemy<2.1.0 trong requirements.txt |
+| Không tương thích phiên bản scikit-learn khi unpickle model trên VM | Máy ảo cài bản scikit-learn 1.7 mới nhất trong khi model huấn luyện với bản 1.4.2 | Cài đặt đúng scikit-learn==1.4.2 trên máy ảo |
 
 ---
 
-## 4. So Sánh Bước 2 và Bước 3 (bắt buộc, 2 - 3 câu)
-
-<!-- Lấy số liệu từ bảng ở mục 3.6 của tasks/buoc-3.md. -->
+## 4. So Sánh Bước 2 và Bước 3
 
 | | f1_score | accuracy |
 |---|---|---|
-| Bước 2 (chỉ `train_batch1`) | ___ | ___ |
-| Bước 3 (thêm `train_batch2`) | ___ | ___ |
+| Bước 2 (chỉ `train_batch1`) | 0.7222 | 0.8800 |
+| Bước 3 (thêm `train_batch2`) | 0.7306 | 0.8820 |
 
-**Nhận xét:** ___
-
-<!--
-Một câu trả lời trung thực kiểu "f1 giảm 0,01 vì dữ liệu mới cùng phân phối, không mang
-thêm thông tin mới" được đánh giá cao hơn kết luận sai rằng thêm dữ liệu luôn tốt hơn.
--->
-
----
-
-## 5. Phần Bonus Đã Thực Hiện (nếu có)
-
-<!-- Xóa cả mục 5 nếu không làm bonus. Mỗi bonus tối đa 1 dòng. -->
-
-- [ ] Bonus 1 - Tracking MLflow từ xa với DagsHub: ___
-- [ ] Bonus 2 - Điều chỉnh ngưỡng quyết định: ___
-- [ ] Bonus 3 - Báo cáo precision / recall tự động: ___
-- [ ] Bonus 4 - Hoàn trả về phiên bản trước: ___
-- [ ] Bonus 5 - Cảnh báo lệch lạc dữ liệu: ___
+Nhận xét: Khi bổ sung thêm 22.361 mẫu từ batch 2, f1_score tăng từ 0.7222 lên 0.7306 và accuracy tăng từ 0.8800 lên 0.8820. Việc có thêm mẫu giúp mô hình phân định biên giới lớp chính xác hơn một phần nhỏ. Quan trọng nhất là toàn bộ quy trình continuous training đã tự động kích hoạt thành công từ commit dữ liệu đến huấn luyện và triển khai lại trên máy ảo mà không cần bất kỳ can thiệp thủ công nào.
